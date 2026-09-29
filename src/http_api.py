@@ -71,7 +71,11 @@ def make_handler(service: Service, static_dir: str):
                 status = 400
             else:
                 status = 500
-            self._json(status, {"error": exc.__class__.__name__, "message": str(exc)})
+            payload = {"error": exc.__class__.__name__, "message": str(exc)}
+            blockers = getattr(exc, "blockers", None)
+            if blockers:
+                payload["blockers"] = blockers
+            self._json(status, payload)
 
         def do_GET(self) -> None:
             try:
@@ -98,6 +102,18 @@ def make_handler(service: Service, static_dir: str):
                     actor, role = self._identity()
                     del actor
                     self._json(200, {"events": service.audit(role)})
+                elif path == "/api/snapshots":
+                    actor, role = self._identity()
+                    del actor
+                    self._json(200, {"snapshots": service.list_snapshots(role)})
+                elif path == "/api/snapshots/current":
+                    actor, role = self._identity()
+                    del actor
+                    snapshot = service.current_snapshot(role)
+                    if snapshot is None:
+                        self._json(404, {"error": "not_found", "message": "尚未发布水情快照"})
+                    else:
+                        self._json(200, snapshot)
                 else:
                     self._json(404, {"error": "not_found"})
             except Exception as exc:
@@ -110,6 +126,8 @@ def make_handler(service: Service, static_dir: str):
                 body = self._body()
                 if path == "/api/items":
                     self._json(201, service.create_item(body, actor, role))
+                elif path == "/api/snapshots":
+                    self._json(201, service.publish_snapshot(body, actor, role))
                 elif path.startswith("/api/items/") and path.endswith("/records"):
                     item_id = int(path.split("/")[3])
                     self._json(201, service.add_record(item_id, body, actor, role))
@@ -117,8 +135,9 @@ def make_handler(service: Service, static_dir: str):
                     item_id = int(path.split("/")[3])
                     target = body.get("target")
                     expected = body.get("expected_version")
+                    idem_key = body.get("idempotency_key") or self.headers.get("Idempotency-Key")
                     self._json(200, service.transition(
-                        item_id, target, expected, actor, role))
+                        item_id, target, expected, actor, role, idem_key))
                 else:
                     self._json(404, {"error": "not_found"})
             except Exception as exc:

@@ -9,7 +9,10 @@ class DomainError(Exception):
 class ValidationError(DomainError): kind=ErrorKind.VALIDATION
 class NotFoundError(DomainError): kind=ErrorKind.NOT_FOUND
 class PermissionDenied(DomainError): kind=ErrorKind.FORBIDDEN
-class ConflictError(DomainError): kind=ErrorKind.CONFLICT
+class ConflictError(DomainError):
+    kind=ErrorKind.CONFLICT
+    def __init__(self,message,blockers=None):
+        super().__init__(message); self.blockers=list(blockers) if blockers else []
 SEVERITIES=['routine', 'attention', 'urgent', 'emergency']; STATES=['draft', 'checked', 'authorized', 'executed', 'closed']; ROLES=['duty_officer', 'chief_engineer', 'dispatcher', 'viewer']
 @dataclass(frozen=True)
 class Item:
