@@ -98,6 +98,23 @@ def make_handler(service: Service, static_dir: str):
                     actor, role = self._identity()
                     del actor
                     self._json(200, {"events": service.audit(role)})
+                elif path == "/api/snapshots":
+                    actor, role = self._identity()
+                    del actor
+                    self._json(200, {"snapshots": service.list_snapshots(role)})
+                elif path == "/api/snapshots/current":
+                    actor, role = self._identity()
+                    del actor
+                    snapshot = service.current_snapshot(role)
+                    if snapshot is None:
+                        self._json(404, {"error": "not_found", "message": "暂无快照"})
+                    else:
+                        self._json(200, {"snapshot": snapshot})
+                elif path.startswith("/api/operations/"):
+                    key = path.rsplit("/", 1)[-1]
+                    actor, role = self._identity()
+                    del actor
+                    self._json(200, {"operation": service.get_operation(key, role)})
                 else:
                     self._json(404, {"error": "not_found"})
             except Exception as exc:
@@ -110,6 +127,11 @@ def make_handler(service: Service, static_dir: str):
                 body = self._body()
                 if path == "/api/items":
                     self._json(201, service.create_item(body, actor, role))
+                elif path == "/api/snapshots":
+                    result = service.create_snapshot(
+                        body.get("kind"), body.get("payload", {}),
+                        body.get("note", ""), actor, role)
+                    self._json(201, result)
                 elif path.startswith("/api/items/") and path.endswith("/records"):
                     item_id = int(path.split("/")[3])
                     self._json(201, service.add_record(item_id, body, actor, role))
@@ -119,6 +141,12 @@ def make_handler(service: Service, static_dir: str):
                     expected = body.get("expected_version")
                     self._json(200, service.transition(
                         item_id, target, expected, actor, role))
+                elif path.startswith("/api/items/") and path.endswith("/execute"):
+                    item_id = int(path.split("/")[3])
+                    result = service.execute_dispatch(
+                        item_id, body.get("expected_version"),
+                        body.get("idempotency_key"), actor, role)
+                    self._json(200, result)
                 else:
                     self._json(404, {"error": "not_found"})
             except Exception as exc:

@@ -3,6 +3,15 @@ from .domain import ConflictError, ValidationError
 TITLE='水库防汛调度与操作确认'; ENTITY='调度指令'; ID_PREFIX='RF'
 SEVERITIES=['routine', 'attention', 'urgent', 'emergency']; STATES=['draft', 'checked', 'authorized', 'executed', 'closed']; TRANSITIONS={'draft': ['checked'], 'checked': ['authorized'], 'authorized': ['executed'], 'executed': ['closed'], 'closed': []}; TRANSITION_ROLES={'checked': ['duty_officer'], 'authorized': ['chief_engineer'], 'executed': ['dispatcher'], 'closed': ['chief_engineer']}
 CREATE_ROLES=set(['duty_officer']); RECORD_ROLES=set(['duty_officer', 'dispatcher']); AUDIT_ROLES=set(['chief_engineer', 'viewer']); VIEW_ROLES=set(['duty_officer', 'chief_engineer', 'dispatcher', 'viewer'])
+SNAPSHOT_ROLES=set(['duty_officer', 'chief_engineer'])
+SNAPSHOT_KINDS=('water', 'restriction')
+SNAPSHOT_KIND_LABELS={'water':'水情', 'restriction':'施工限制'}
+# 快照更新后，旧授权退回的状态（待复核）；已执行/已关闭指令不可倒退
+STALE_AUTHORIZATION_TARGET='checked'
+SNAPSHOT_INVALIDATION_REASON='水情或施工限制快照更新，原复核授权依据失效'
+EXECUTE_ROLES=set(['dispatcher'])
+WATER_PAYLOAD_FIELDS=('water_level', 'inflow', 'downstream_warning_level')
+RESTRICTION_PAYLOAD_FIELDS=('max_discharge',)
 SEVERITY_WEIGHT={'routine': 1.0, 'attention': 3.0, 'urgent': 6.0, 'emergency': 9.0}; DEADLINE_HOURS={'routine': 72, 'attention': 24, 'urgent': 8, 'emergency': 4}; TERMINAL_STATES=set(['closed'])
 def priority_score(severity,quantity=0.0,threshold=1.0,open_records=0):
     if severity not in SEVERITY_WEIGHT: raise ValidationError("unknown severity")
